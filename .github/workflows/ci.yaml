@@ -2,11 +2,9 @@ name: VProfile CI Pipeline
 
 on:
   push:
-    # Run automatically whenever a commit is pushed to any branch.
     branches:
       - "**"
   pull_request:
-    # Also run when a pull request targets main.
     branches:
       - main
   workflow_dispatch:
@@ -78,7 +76,17 @@ jobs:
           PROJECT_KEY: ${{ vars.PROJECT_KEY }}
           PROJECT_NAME: ${{ vars.PROJECT_NAME }}
         run: |
-          mvn -B org.sonarsource.scanner.maven:sonar-maven-plugin:sonar             -Dsonar.host.url="${SONAR_HOST_URL}"             -Dsonar.token="${SONAR_TOKEN}"             -Dsonar.organization="${ORGANIZATION}"             -Dsonar.projectKey="${PROJECT_KEY}"             -Dsonar.projectName="${PROJECT_NAME}"             -Dsonar.sources=src/main/java             -Dsonar.tests=src/test/java             -Dsonar.java.binaries=target/classes             -Dsonar.junit.reportPaths=target/surefire-reports             -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
+          mvn -B org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
+            -Dsonar.host.url="${SONAR_HOST_URL}" \
+            -Dsonar.token="${SONAR_TOKEN}" \
+            -Dsonar.organization="${ORGANIZATION}" \
+            -Dsonar.projectKey="${PROJECT_KEY}" \
+            -Dsonar.projectName="${PROJECT_NAME}" \
+            -Dsonar.sources=src/main/java \
+            -Dsonar.tests=src/test/java \
+            -Dsonar.java.binaries=target/classes \
+            -Dsonar.junit.reportPaths=target/surefire-reports \
+            -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
 
   docker-build:
     name: 4. Build Docker Image
