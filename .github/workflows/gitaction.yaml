@@ -21,28 +21,32 @@ jobs:
           java-version: '21'
           cache: maven
 
-      # 3. Maven Build and Test
+      # 3. Verify Java Version
+      - name: Check Java Version
+        run: |
+          java -version
+          echo "JAVA_HOME=$JAVA_HOME"
+
+      # 4. Maven Build and Test
       - name: Maven Build and Test
         run: mvn clean verify
 
-      # 4. Checkstyle
+      # 5. Checkstyle
       - name: Checkstyle
         run: mvn checkstyle:checkstyle
 
-      # 5. Setup Sonar Scanner
-      - name: Setup Sonar Scanner
-        uses: warchant/setup-sonar-scanner@v7
-
       # 6. SonarCloud Scan
       - name: SonarCloud Scan
-        run: |
-          sonar-scanner \
-            -Dsonar.host.url=https://sonarcloud.io \
-            -Dsonar.token=${{ secrets.SONAR_TOKEN }} \
-            -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }} \
-            -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }} \
-            -Dsonar.sources=src/ \
-            -Dsonar.junit.reportPaths=target/surefire-reports/ \
-            -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml \
-            -Dsonar.java.checkstyle.reportPaths=target/checkstyle-result.xml \
+        uses: SonarSource/sonarqube-scan-action@v5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.host.url=https://sonarcloud.io
+            -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }}
+            -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }}
+            -Dsonar.sources=src/
+            -Dsonar.junit.reportPaths=target/surefire-reports/
+            -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
+            -Dsonar.java.checkstyle.reportPaths=target/checkstyle-result.xml
             -Dsonar.java.binaries=target/classes
