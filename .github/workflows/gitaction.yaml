@@ -100,16 +100,44 @@ jobs:
           print("RDS configuration updated successfully!")
           PY
 
-
-      - name: Build & Upload image to ECR
-        uses: appleboy/docker-ecr-action@master
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-         access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
-         secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-         registry: ${{ secrets.REGISTRY }}
-         repo: actapp
-         region: ${{ env.AWS_REGION }}
-         tags: latest,${{ github.run_number }}
-         daemon_off: false
-         dockerfile: ./Dockerfile
-         context: ./
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # 4. Login to Amazon ECR
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # 5. Build Docker Image
+      - name: Build Docker Image
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          REPOSITORY: actapp
+          IMAGE_TAG: ${{ github.run_number }}
+        run: |
+          docker build -t $REGISTRY/$REPOSITORY:latest .
+          docker tag $REGISTRY/$REPOSITORY:latest $REGISTRY/$REPOSITORY:$IMAGE_TAG
+
+      # 6. Push Docker Image to ECR
+      - name: Push Docker Image to ECR
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          REPOSITORY: actapp
+          IMAGE_TAG: ${{ github.run_number }}
+        run: |
+          docker push $REGISTRY/$REPOSITORY:latest
+          docker push $REGISTRY/$REPOSITORY:$IMAGE_TAG
+
+      # 7. Verify ECR Images
+      - name: Verify ECR Images
+        run: |
+          aws ecr describe-images \
+            --repository-name actapp \
+            --region $AWS_REGION \
+            --query 'imageDetails[*].imageTags' \
+            --output table
+
