@@ -1,0 +1,95 @@
+
+  BUILD_AND_PUBLISH:
+    needs: Testing
+    runs-on: ubuntu-latest
+
+    env:
+      AWS_REGION: us-east-2
+
+    steps:
+      # 1. Checkout source code
+      - name: Code checkout
+        uses: actions/checkout@v4
+
+      # 2. Configure Java
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # 3. Update database configuration
+      - name: Update application.properties file
+        env:
+          RDS_USER: ${{ secrets.RDS_USER }}
+          RDS_PASS: ${{ secrets.RDS_PASS }}
+          RDS_ENDPOINT: ${{ secrets.RDS_ENDPOINT }}
+        run: |
+          python3 - <<'PY'
+          import os
+          import re
+
+          file_path = "src/main/resources/application.properties"
+
+          with open(file_path, "r") as file:
+              content = file.read()
+
+          username = os.environ["RDS_USER"]
+          password = os.environ["RDS_PASS"]
+          endpoint = os.environ["RDS_ENDPOINT"]
+
+          if not all([username, password, endpoint]):
+              raise ValueError("RDS secrets are missing!")
+
+          content, user_count = re.subn(
+              r"(?m)^jdbc.username=.*$",
+              lambda m: "jdbc.username=" + username,
+              content
+          )
+
+          content, pass_count = re.subn(
+              r"(?m)^jdbc.password=.*$",
+              lambda m: "jdbc.password=" + password,
+              content
+          )
+
+          content, endpoint_count = re.subn(
+              r"(?m)^(jdbc.url=jdbc:mysql://)db01(:.*)$",
+              lambda m: m.group(1) + endpoint + m.group(2),
+              content
+          )
+
+          if not all([user_count, pass_count, endpoint_count]):
+              raise ValueError("Could not find all JDBC properties!")
+
+          with open(file_path, "w") as file:
+              file.write(content)
+
+          print("RDS configuration updated successfully!")
+          PY
+
+      # 4. Configure AWS credentials
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # 5. Login to Amazon ECR
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # 6. Build and push Docker image to ECR
+      - name: Build & Upload image to ECR
+        uses: appleboy/docker-ecr-action@master
+        with:
+          access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          registry: ${{ secrets.REGISTRY }}
+          repo: actapp
+          region: ${{ env.AWS_REGION }}
+          tags: latest,${{ github.run_number }}
+          daemon_off: false
+          dockerfile: ./Dockerfile
+          context: ./
