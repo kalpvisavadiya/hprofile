@@ -60,19 +60,45 @@ jobs:
         uses: actions/checkout@v4
 
      
+      
       - name: Update application.properties file
         env:
           RDS_USER: ${{ secrets.RDS_USER }}
           RDS_PASS: ${{ secrets.RDS_PASS }}
           RDS_ENDPOINT: ${{ secrets.RDS_ENDPOINT }}
         run: |
-          ls -l src/main/resources/application.properties
+          python3 - <<'PY'
+          import os
+          import re
 
-          sed -i "s|^jdbc.username=.*|jdbc.username=${RDS_USER}|" src/main/resources/application.properties
+          file_path = "src/main/resources/application.properties"
 
-          sed -i "s|^jdbc.password=.*|jdbc.password=${RDS_PASS}|" src/main/resources/application.properties
+          with open(file_path, "r") as f:
+              content = f.read()
 
-          sed -i "s|db01|${RDS_ENDPOINT}|g" src/main/resources/application.properties
+          content = re.sub(
+              r"(?m)^jdbc.username=.*$",
+              lambda m: "jdbc.username=" + os.environ["RDS_USER"],
+              content
+          )
+
+          content = re.sub(
+              r"(?m)^jdbc.password=.*$",
+              lambda m: "jdbc.password=" + os.environ["RDS_PASS"],
+              content
+          )
+
+          content = re.sub(
+              r"(?m)^(jdbc.url=jdbc:mysql://)db01(:.*)$",
+              lambda m: m.group(1) + os.environ["RDS_ENDPOINT"] + m.group(2),
+              content
+          )
+
+          with open(file_path, "w") as f:
+              f.write(content)
+
+          print("RDS configuration updated successfully!")
+          PY
 
 
       - name: Build & Upload image to ECR
